@@ -121,11 +121,9 @@ To run this API locally, follow these steps:
 
     $ curl http://127.0.0.1:5000/api/v1/books/<ISBN>
 
-    $ curl -X POST http://127.0.0.1:5000/api/v1/books -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"isbn": <isbn>, "title": "<title>", "author": "<author>", "genre": "<genre>", "year": <year>, "publisher": "<publisher>", "quantity": <quantity>, "price": <price>
-    }'
+    $ curl -X POST http://127.0.0.1:5000/api/v1/books -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"isbn": <isbn>, "title": "<title>", "author": <author>", "genre": "<genre>", "year": <year>, "publisher": "<publisher>", "quantity": <quantity>, "price": <price>}'
 
-    $ curl -X PUT http://127.0.0.1:5000/api/v1/books/<ISBN> -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"isbn": <isbn>, "title": "<title>", "author": "<author>", "genre": "<genre>", "year": <year>, "publisher": "<publisher>", "quantity": <quantity>, "price": <price>
-    }'
+    $ curl -X PUT http://127.0.0.1:5000/api/v1/books/<ISBN> -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"isbn": <isbn>, "title": "<title>", "author": "<author>", "genre": "<genre>", "year": <year>, "publisher": "<publisher>", "quantity": <quantity>, "price": <price>}'
 
     $ curl -X DELETE http://127.0.0.1:5000/api/v1/books/<ISBN> -H "Content-Type: application/json" -H "Authorization: Bearer <token>"
     ```
