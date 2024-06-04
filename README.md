@@ -6,6 +6,21 @@ This API allows you to manage a collection of books. You can perform CRUD operat
 
 ## API Endpoints
 
+### Register Account
+**Endpoint:** `POST /api/v1/token/register`
+
+**Description:** Create new account.
+
+### Login User Account Token
+**Endpoint:** `POST /api/v1/token/login`
+
+**Description:** Login account to get an access token.
+
+### Destroy Account Token
+**Endpoint:** `POST /api/v1/token/logout`
+
+**Description:** Log-out account by revoking the token.
+
 ### Get All Books
 **Endpoint:** `GET /api/v1/books`
 
@@ -33,6 +48,8 @@ This API allows you to manage a collection of books. You can perform CRUD operat
 
 ## Request Body Fields
 
+- **username**: The account user
+- **password**: The account password
 - **isbn**: The International Standard Book Number (ISBN) of the book.
 - **title**: The title of the book.
 - **author**: The author of the book.
@@ -86,6 +103,33 @@ To run this API locally, follow these steps:
     http://127.0.0.1:5000/api/v1/<route>
     ```
 
+## Usage
+
+1. Auth:
+    ```
+    $ curl -X POST http://127.0.0.1:5000/api/v1/token/register -H "Content-Type: application/json" -d '{"username": "<user>", "password": "<pass>"}'
+
+    $ curl -X POST http://127.0.0.1:5000/api/v1/token/login -H "Content-Type: application/json" -d '{"username": "<user>", "password": "<pass>"}'
+
+    $ curl -X POST http://127.0.0.1:5000/api/v1/token/logout -H "Content-Type: application/json" -H "Authorization: Bearer <token>"
+
+    ```
+
+2. Read, Add, Edit & Delete Book:
+    ```
+    $ curl http://127.0.0.1:5000/api/v1/books
+
+    $ curl http://127.0.0.1:5000/api/v1/books/<ISBN>
+
+    $ curl -X POST http://127.0.0.1:5000/api/v1/books -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"isbn": <isbn>, "title": "<title>", "author": "<author>", "genre": "<genre>", "year": <year>, "publisher": "<publisher>", "quantity": <quantity>, "price": <price>
+    }'
+
+    $ curl -X PUT http://127.0.0.1:5000/api/v1/books/<ISBN> -H "Content-Type: application/json" -H "Authorization: Bearer <token>" -d '{"isbn": <isbn>, "title": "<title>", "author": "<author>", "genre": "<genre>", "year": <year>, "publisher": "<publisher>", "quantity": <quantity>, "price": <price>
+    }'
+
+    $ curl -X DELETE http://127.0.0.1:5000/api/v1/books/<ISBN> -H "Content-Type: application/json" -H "Authorization: Bearer <token>"
+    ```
+    
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

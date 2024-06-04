@@ -1,9 +1,75 @@
 from flask import Blueprint, request, jsonify
+from werkzeug.security import generate_password_hash, check_password_hash
+from marshmallow import ValidationError
+from flask_jwt_extended import (
+    jwt_required, 
+    create_access_token,
+    get_jwt
+)
 
-from app.models import Book
+from app.schema import AuthSchema, BookSchema
+from app.models import Auth, Book
+from . import jwt
 from . import db
 
 rest_api = Blueprint('blue_print', __name__)
+
+@rest_api.route('/token/register', methods=['POST'])
+def register():
+    # Register new user
+    auth_schema = AuthSchema()
+
+    try:
+      validated_data = auth_schema.load(request.json)
+
+      username = validated_data['username']
+      password = validated_data['password']
+      if Auth.query.filter_by(username=username).first():
+         return jsonify({'message': 'User already taken.'})
+      
+      hashed_password = generate_password_hash(password, method='pbkdf2:sha256', salt_length=8)
+
+      new_account = Auth(
+         username = username,
+         password = hashed_password
+      )
+
+      db.session.add(new_account)
+      db.session.commit()
+
+      return jsonify({'message': 'Account registered.'})
+
+    except ValidationError as error:
+      return jsonify(error.messages), 400
+
+@rest_api.route('/token/login', methods=['POST'])
+def login():
+    # Login user
+    username = request.json.get('username')
+    password = request.json.get('password')
+
+    auth = Auth.query.filter_by(username=username).first()
+
+    if auth and check_password_hash(auth.password, password):
+       access_token = create_access_token(identity=username)
+       return jsonify(access_token=access_token)
+    
+    return jsonify({'message': 'Incorrect credentials.'}), 401
+
+blacklist = set()
+
+@jwt.token_in_blocklist_loader
+def check_if_token_in_blacklist(jwt_header, jwt_payload):
+    jti = jwt_payload['jti']
+    return jti in blacklist
+
+@rest_api.route('/token/logout', methods=['POST'])
+@jwt_required()
+def logout():
+    # Destroy token
+    jti = get_jwt()['jti']
+    blacklist.add(jti)
+    return jsonify({'message': 'Log out.'}), 200
 
 @rest_api.route('/books', methods=['GET', 'POST'])
 def book_list():
@@ -11,82 +77,91 @@ def book_list():
     if request.method == 'GET':
        list_of_books = Book.query.all()
 
-       books = []
-       for book in list_of_books:
-           books.append({
-              'id': book.id,
-              'isbn': book.isbn,
-              'title': book.title,
-              'author': book.author,
-              'genre': book.genre,
-              'year': book.year,
-              'publisher': book.publisher,
-              'quantity': book.quantity,
-              'price': book.price
-           })
-
-       return jsonify(books), 200
+       book_schema = BookSchema(many=True)
+       result = book_schema.dump(list_of_books)
+       return jsonify(result), 200
 
     # Add new book
     elif request.method == 'POST':
-       add_book = Book(
-          isbn = request.json.get('isbn'),
-          title = request.json.get('title'),
-          author = request.json.get('author'),
-          genre = request.json.get('genre'),
-          year = request.json.get('year'),
-          publisher = request.json.get('publisher'),
-          quantity = request.json.get('quantity'),
-          price = request.json.get('price')
-       )
+       @jwt_required()
+       def add_new_book():
+           book_schema = BookSchema()
 
-       db.session.add(add_book)
-       db.session.commit()
+           try:
+             validated_data = book_schema.load(request.json)
 
-       return jsonify({'message': 'Book added!'}), 201
+             if Book.query.filter_by(isbn=validated_data['isbn']).first():
+                return jsonify({'message': 'ISBN must not be duplicated.'})
 
+             add_book = Book(
+                isbn = validated_data['isbn'],
+                title = validated_data['title'],
+                author = validated_data['author'],
+                genre = validated_data['genre'],
+                year = validated_data['year'],
+                publisher = validated_data['publisher'],
+                quantity = validated_data['quantity'],
+                price = validated_data['price']
+             )
+
+             db.session.add(add_book)
+             db.session.commit()
+
+             return jsonify({'Book added': book_schema.dump(add_book)}), 201
+           except ValidationError as error:
+             return jsonify(error.messages), 400
+        
+       return add_new_book()
+       
 @rest_api.route('/books/<isbn>', methods=['GET', 'PUT', 'DELETE'])
 def books(isbn):
     # Read single book
     if request.method == 'GET':
        book = Book.query.filter_by(isbn=isbn).first()
 
-       return jsonify({
-           'id': book.id,
-           'isbn': book.isbn,
-           'title': book.title,
-           'author': book.author,
-           'genre': book.genre,
-           'year': book.year,
-           'publisher': book.publisher,
-           'quantity': book.quantity,
-           'price': book.price
-       }), 200
+       book_schema = BookSchema()
+       result = book_schema.dump(book)
+       return jsonify(result), 200
     
     # Update book
     elif request.method == 'PUT':
-        update_book = Book.query.filter_by(isbn=isbn).first()
+        @jwt_required()
+        def edit_book():
+            update_book = Book.query.filter_by(isbn=isbn).first()
+            
+            book_schema = BookSchema()
 
-        update_book.isbn = request.json.get('isbn')
-        update_book.title = request.json.get('title')
-        update_book.author = request.json.get('author')
-        update_book.genre = request.json.get('genre')
-        update_book.year = request.json.get('year')
-        update_book.publisher = request.json.get('publisher')
-        update_book.quantity = request.json.get('quantity')
-        update_book.price = request.json.get('price')
+            try:
+              validated_data = book_schema.load(request.json)
 
-        db.session.add(update_book)
-        db.session.commit()
+              update_book.isbn = validated_data['isbn']
+              update_book.title = validated_data['title']
+              update_book.author = validated_data['author']
+              update_book.genre = validated_data['genre']
+              update_book.year = validated_data['year']
+              update_book.publisher = validated_data['publisher']
+              update_book.quantity = validated_data['quantity']
+              update_book.price = validated_data['price']
 
-        return jsonify({'message': 'Book updated!'}), 201
-    
+              db.session.add(update_book)
+              db.session.commit()
+
+              return jsonify({'message': 'Book updated!'}), 201
+            except ValidationError as error:
+              return jsonify(error.messages), 400
+            
+        return edit_book()
+        
     # Delete book
     elif request.method == 'DELETE':
-        delete_book = Book.query.filter_by(isbn=isbn).first()
+        @jwt_required()
+        def delete_book():
+            delete_book = Book.query.filter_by(isbn=isbn).first()
 
-        db.session.delete(delete_book)
-        db.session.commit()
+            db.session.delete(delete_book)
+            db.session.commit()
 
-        return jsonify({'message': 'Book deleted!'}), 200
+            return jsonify({'message': 'Book deleted!'}), 200
+        
+        return delete_book()
     
